@@ -1,0 +1,57 @@
+Table products {
+  id integer [primary key, increment]
+  sku varchar(50) [unique, not null, note: 'Unikalny kod towaru']
+  name varchar(150) [not null]
+  unit varchar(20) [not null, default: 'szt', note: 'np. szt, kg, pal']
+  min_stock decimal(12,3) [not null, default: 0, note: 'Próg alarmowy stanu']
+  created_at timestamp [default: `now()`]
+}
+
+Table locations {
+  id integer [primary key, increment]
+  code varchar(30) [unique, not null, note: 'np. A-01-02 (strefa-regał-półka)']
+  zone varchar(30) [not null, note: 'np. przyjecia, wysokie_skladowanie, wydania']
+  max_capacity decimal(12,3) [not null]
+  is_active boolean [not null, default: true]
+}
+
+Table stock_levels {
+  id integer [primary key, increment]
+  product_id integer [not null]
+  location_id integer [not null]
+  quantity decimal(12,3) [not null, default: 0]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    (product_id, location_id) [unique, name: 'idx_product_location_unique']
+  }
+}
+
+Table contractors {
+  id integer [primary key, increment]
+  name varchar(150) [not null]
+  tax_id varchar(20) [note: 'NIP']
+  contractor_type varchar(20) [not null, note: 'supplier, customer, both']
+  email varchar(120)
+}
+
+Table stock_movements {
+  id integer [primary key, increment]
+  product_id integer [not null]
+  contractor_id integer [note: 'Opcjonalnie dla przyjęć/wydań zewnętrznych']
+  from_location_id integer [note: 'Lokalizacja źródłowa (np. dla WZ lub MM)']
+  to_location_id integer [note: 'Lokalizacja docelowa (np. dla PZ lub MM)']
+  movement_type varchar(10) [not null, note: 'PZ, WZ, MM, INV']
+  quantity decimal(12,3) [not null]
+  document_ref varchar(60) [note: 'Numer dokumentu magazynowego/faktury']
+  created_at timestamp [default: `now()`]
+}
+
+// Relacje
+Ref: stock_levels.product_id > products.id [delete: restrict]
+Ref: stock_levels.location_id > locations.id [delete: restrict]
+
+Ref: stock_movements.product_id > products.id [delete: restrict]
+Ref: stock_movements.contractor_id > contractors.id [delete: set null]
+Ref: stock_movements.from_location_id > locations.id [delete: restrict]
+Ref: stock_movements.to_location_id > locations.id [delete: restrict]
