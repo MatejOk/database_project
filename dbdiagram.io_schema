@@ -1,84 +1,57 @@
-enum product_category {
-  Elektronika
-  Kable
-  Akcesoria
-}
-
-enum contractor_type {
-  SUPPLIER
-  CLIENT
-  BOTH
-}
-
-enum document_type {
-  PZ
-  WZ
-  MM
-}
-
 Table products {
-  id integer [primary key, increment]
-  sku varchar(50) [unique, not null, note: 'Unikalny kod magazynowy produktu']
-  name varchar(150) [not null]
-  category product_category [not null, note: 'np. Elektronika, Kable, Akcesoria']
-  unit varchar(20) [not null, default: 'szt.', note: 'np. szt., kg, m']
-  unit_weight_kg decimal(10,3) [not null, note: 'Waga 1 jednostki w kg (limit nośności lokalizacji)']
-  min_stock decimal(12,3) [not null, default: 0, note: 'Próg alarmowy niskiego stanu']
-  created_at timestamp [default: `now()`]
+  id integer [pk, note: 'Unikalny identyfikator produktu, np. 0000001']
+  sku varchar(50) [unique, not null, note: 'Unikalny kod magazynowy, np. LAPTOP-THINKPAD-T16']
+  name varchar(150) [not null, note: 'Nazwa produktu']
+  category varchar(50) [note: 'Kategoria towaru (np. Elektronika, Kable, Akcesoria, Inne)']
+  unit varchar(20) [not null, note: 'Jednostka miary (np. szt., kg, m)']
+  unit_weight_kg decimal(10,3) [note: 'Waga jednej jednostki produktu w kg']
+  min_stock decimal(12,3) [note: 'Próg alarmowy do powiadomień o braku towaru']
+  created_at timestamp [default: `now()`, note: 'Data i czas dodania produktu do bazy']
+  updated_at timestamp [note: 'Czas ostatniej aktualizacji wiersza']
+
+  Note: 'Kartoteka produktów - definicja bez stanu ilościowego'
 }
 
 Table locations {
-  id integer [primary key, increment]
-  code varchar(30) [unique, not null, note: 'np. A-01-03']
-  zone varchar(50) [not null, note: 'np. Strefa A, Chłodnia']
-  max_weight_kg decimal(12,3) [not null, note: 'Maksymalna dopuszczalna waga na lokalizacji']
-  is_active boolean [not null, default: true, note: 'Czy lokalizacja jest aktywna']
+  id integer [pk, note: 'Unikalny identyfikator lokalizacji']
+  code varchar(30) [unique, not null, note: 'Unikalny kod miejsca magazynowego, np. A-01-03']
+  zone varchar(30) [note: 'Strefa magazynu (np. Strefa A, Chłodnia)']
+  max_weight_kg decimal(12,3) [note: 'Maksymalna dopuszczalna waga towaru na lokalizacji']
+  is_active boolean [default: true, note: 'Flaga określająca, czy lokalizacja jest aktywna']
+
+  Note: 'Fizyczne miejsca składowania w magazynie'
 }
 
 Table stock_levels {
-  product_id integer [not null]
-  location_id integer [not null]
-  quantity decimal(12,3) [not null, default: 0, note: 'Aktualna ilość nieujemna']
-  updated_at timestamp [default: `now()`]
+  product_id integer [pk, ref: > products.id, note: 'Odniesienie do produktu']
+  location_id integer [pk, ref: > locations.id, note: 'Odniesienie do lokalizacji']
+  quantity decimal(12,3) [not null, note: 'Aktualna ilość produktu w danej lokalizacji (nieujemna)']
+  updated_at timestamp [note: 'Data i czas ostatniej zmiany stanu']
 
-  indexes {
-    (product_id, location_id) [pk]
-  }
+  Note: 'Aktualny stan na konkretnej lokalizacji - tabela łącząca N:M'
 }
 
 Table contractors {
-  id integer [primary key, increment]
-  name varchar(150) [not null]
-  tax_id varchar(20) [note: 'Numer NIP']
-  contractor_type contractor_type [not null, note: 'SUPPLIER, CLIENT, BOTH']
-  email varchar(120)
-}
+  id integer [pk, note: 'Unikalny identyfikator kontrahenta']
+  name varchar(150) [not null, note: 'Nazwa kontrahenta']
+  tax_id varchar(20) [note: 'Numer identyfikacji podatkowej (NIP)']
+  contractor_type varchar(20) [note: 'Typ kontrahenta (SUPPLIER, CLIENT, BOTH)']
+  email varchar(120) [note: 'Adres e-mail kontrahenta']
 
-Table documents {
-  id integer [primary key, increment]
-  doc_number varchar(50) [unique, not null, note: 'np. PZ/2026/11/001']
-  doc_type document_type [not null, note: 'PZ - przyjęcie, WZ - wydanie, MM - przesunięcie']
-  contractor_id integer [note: 'NULL dla przesunięć wewnętrznych MM']
-  created_at timestamp [default: `now()`]
+  Note: 'Dostawcy i odbiorcy'
 }
 
 Table stock_movements {
-  id integer [primary key, increment]
-  document_id integer [not null]
-  product_id integer [not null]
-  from_location_id integer [note: 'NULL przy PZ']
-  to_location_id integer [note: 'NULL przy WZ']
-  quantity decimal(12,3) [not null]
-  unit_price decimal(12,2) [note: 'Cena jednostkowa; NULL przy przesunięciu MM']
+  id integer [pk, note: 'Unikalny identyfikator ruchu']
+  product_id integer [not null, ref: > products.id, note: 'Odniesienie do przemieszczanego produktu']
+  contractor_id integer [ref: > contractors.id, note: 'Odniesienie do kontrahenta (NULL przy przesunięciu wewnętrznym MM)']
+  from_location_id integer [ref: > locations.id, note: 'Lokalizacja źródłowa (NULL przy przyjęciu PZ)']
+  to_location_id integer [ref: > locations.id, note: 'Lokalizacja docelowa (NULL przy wydaniu WZ)']
+  movement_type varchar(10) [not null, note: 'Typ operacji (PZ – przyjęcie, WZ – wydanie, MM – przesunięcie)']
+  quantity decimal(12,3) [not null, note: 'Ilość przemieszczanego towaru']
+  unit_price decimal(12,2) [note: 'Cena jednostkowa w momencie operacji (NULL przy MM)']
+  document_ref varchar(60) [note: 'Numer dokumentu powiązanego z ruchem (np. PZ/2026/11/001)']
+  created_at timestamp [default: `now()`, note: 'Data i czas wykonania ruchu']
+
+  Note: 'Historia wszystkich ruchów magazynowych'
 }
-
-// Relacje
-Ref: stock_levels.product_id > products.id [delete: restrict]
-Ref: stock_levels.location_id > locations.id [delete: restrict]
-
-Ref: documents.contractor_id > contractors.id [delete: set null]
-
-Ref: stock_movements.document_id > documents.id [delete: cascade]
-Ref: stock_movements.product_id > products.id [delete: restrict]
-Ref: stock_movements.from_location_id > locations.id [delete: restrict]
-Ref: stock_movements.to_location_id > locations.id [delete: restrict]
